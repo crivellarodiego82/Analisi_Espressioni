@@ -1,0 +1,54 @@
+#Crivellaro 2022
+
+import cv2
+import numpy as np
+from keras.preprocessing import image
+from keras.models import model_from_json
+
+
+facePath = "haarcascade_frontalface_alt.xml" # OpenCv Xml
+faceCascade = cv2.CascadeClassifier(facePath)
+
+model = model_from_json(open("modello.json", "r").read())
+model.load_weights('pesi.h5')  # Pesi
+
+emotions = ('Arrabbiato', 'Disgusto', 'Paura', 'Felice', 'Triste', 'Sorpreso', 'Normale')
+cap = cv2.VideoCapture(0)
+cap.set(3, 640)
+cap.set(4, 480)
+
+while True:
+    ret, frame = cap.read()  # Cattura frame per frame
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    faces = faceCascade.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=8, minSize=(55, 55), flags=0)
+
+    for (x, y, w, h) in faces:
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
+
+        detected_face = frame[int(y):int(y + h), int(x):int(x + w)]  # Rilevo volto
+        detected_face = cv2.cvtColor(detected_face, cv2.COLOR_BGR2GRAY)  # Trasformo in scala di grigi
+        detected_face = cv2.resize(detected_face, (48, 48))  # Ridimensiona immagine
+
+        img_pixels = image.img_to_array(detected_face)
+        img_pixels = np.expand_dims(img_pixels, axis=0)
+        img_pixels /= 255  # Normalizzo i valori
+
+        predictions = model.predict(img_pixels)  # Effettuo predizione
+
+# Mappo i valori 0: Arrabbiato 1: Disgusto 2: Paura 3: Felice 4: Triste 5: Sorpreso 6: Normale
+        
+        max_index = np.argmax(predictions[0])
+
+        emotion = emotions[max_index]
+
+        # imprime o 'sentimento' acima da caixa
+        cv2.putText(frame, emotion, (int(x), int(y)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
+    cv2.imshow('Rilevo espressione', frame)
+
+    if cv2.waitKey(1) == 27:
+        break
+
+cap.release()
+cv2.destroyAllWindows()
